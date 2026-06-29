@@ -1,0 +1,52 @@
+name: Atualizar Dashboard (Mês Vigente)
+
+# Quando esse robô roda:
+# 1) "workflow_dispatch" = você pode rodar manualmente, a qualquer hora,
+#    clicando em "Run workflow" na aba Actions do GitHub. Útil para testar
+#    antes de confiar no agendamento automático.
+# 2) "schedule" = roda automaticamente todo dia, no horário definido abaixo.
+#    Horário em UTC. 12:00 UTC = 09:00 em Salvador/Bahia (horário padrão,
+#    sem horário de verão no Brasil atualmente). Ajuste se quiser outro
+#    horário — só mudar o valor de "cron" abaixo.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * *"
+
+jobs:
+  processar-vendas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install pandas
+
+      - name: Processar a planilha do Mês Vigente
+        run: |
+          python scripts/processar_vendas.py \
+            "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8ITT4saEG34h-EOVM69jFCmXJz-hDaQ1V7ausAhlCI-aFjKQYAILvFEdbKqGjg95EDomuR584_ufY/pub?output=csv" \
+            "config/regras_reatribuicao.csv"
+
+      - name: Mover resultados para a pasta de dados do dashboard
+        run: |
+          mkdir -p dados
+          mv vendas_dashboard.json dados/mes_vigente.json
+          mv vendas_processadas_detalhe.csv dados/mes_vigente_detalhe.csv
+          if [ -f linhas_com_erro.csv ]; then mv linhas_com_erro.csv dados/mes_vigente_erros.csv; fi
+
+      # Esse passo só comita se algo de fato mudou — evita ficar criando
+      # commits vazios todo dia quando os dados não mudaram.
+      - name: Salvar resultado no repositório (commit automático)
+        run: |
+          git config user.name "robo-next-level"
+          git config user.email "actions@github.com"
+          git add dados/
+          git diff --staged --quiet || git commit -m "Atualização automática do Mês Vigente - $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
