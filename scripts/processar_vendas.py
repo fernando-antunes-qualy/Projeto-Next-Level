@@ -62,6 +62,26 @@ CODIGO_DEVOLUCAO_VENDA = 4
 CODIGO_BONUS = 5
 CODIGO_DEVOLUCAO_BONUS = 15
 
+# Todas as classes já confirmadas e documentadas com Fernando — mesmo as
+# que são tratadas como "informativas, fora de todos os cálculos"
+# (Remessa Futura, Brindes, Troca de Mercadoria, Trabalho de Campo,
+# Amostra Grátis, Saída em nome da Qualy). Qualquer código de Classe que
+# apareça nos dados e NÃO esteja nessa lista é sinalizado como
+# "desconhecido" no resumo de checagem — para nunca mais sumir em
+# silêncio dos cálculos sem ninguém notar.
+CLASSES_DOCUMENTADAS = {
+    2: "Venda — entra no Faturamento e na Quantidade/Peso",
+    4: "Devolução de Venda — entra no Faturamento e na Quantidade/Peso",
+    5: "Bônus — entra só na Quantidade/Peso",
+    15: "Devolução de Bônus — entra só na Quantidade/Peso",
+    11: "Troca de Mercadoria — informativa, fora de todos os cálculos",
+    23: "Trabalho de Campo — informativa, fora de todos os cálculos",
+    31: "Remessa Futura — informativa, fora de todos os cálculos",
+    37: "Saída Amostra Grátis — informativa, fora de todos os cálculos",
+    39: "Brindes — informativa, fora de todos os cálculos",
+    43: "Saída em nome da Qualy — informativa, fora de todos os cálculos",
+}
+
 
 def extrair_codigo_classe(valor_classe: str) -> int:
     """Extrai o código numérico do início do texto da coluna Classe."""
@@ -246,9 +266,20 @@ if __name__ == "__main__":
         print(f"Arquivo 'linhas_com_erro.csv' salvo com {len(df_erros)} linha(s) para revisão manual.")
 
     print("\n--- RESUMO DE CHECAGEM ---")
-    print("Faturamento total (Venda - Devolução):", round(df["faturamento_ajustado"].sum(), 2))
+    print("Faturamento total (Venda + Devolução):", round(df["faturamento_ajustado"].sum(), 2))
     print("Quantidade total ajustada:", round(df["quantidade_ajustada"].sum(), 2))
     print("Peso líquido total ajustado:", round(df["peso_ajustado"].sum(), 2))
     print("\nDistribuição por código de Classe encontrado:")
     print(df["codigo_classe"].value_counts())
+
+    # Alerta para classes nunca vistas/documentadas antes — para nunca mais
+    # uma Classe nova "desaparecer" dos cálculos sem ninguém perceber.
+    codigos_no_dado = set(df["codigo_classe"].unique())
+    codigos_desconhecidos = codigos_no_dado - set(CLASSES_DOCUMENTADAS.keys())
+    if codigos_desconhecidos:
+        print("\n⚠️  ATENÇÃO: classe(s) de Classe NUNCA documentada(s) encontrada(s)!")
+        for codigo in sorted(codigos_desconhecidos):
+            qtd = (df["codigo_classe"] == codigo).sum()
+            texto = df[df["codigo_classe"] == codigo]["classe"].iloc[0] if qtd > 0 else "?"
+            print(f"   Código {codigo} ('{texto}'): {qtd} linha(s) — sendo EXCLUÍDA de todos os cálculos por padrão até alguém confirmar o tratamento correto.")
     print("\nTotal de RCAs distintos:", df[COLUNA_RCA].nunique())
